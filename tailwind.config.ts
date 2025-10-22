@@ -57,6 +57,24 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        dept: {
+          cse: "hsl(var(--dept-cse))",
+          it: "hsl(var(--dept-it))",
+          ece: "hsl(var(--dept-ece))",
+          mech: "hsl(var(--dept-mech))",
+          civil: "hsl(var(--dept-civil))",
+        },
+      },
+      boxShadow: {
+        card: "var(--shadow-card)",
+        hover: "var(--shadow-hover)",
+      },
+      backgroundImage: {
+        "gradient-primary": "var(--gradient-primary)",
+        "gradient-card": "var(--gradient-card)",
+      },
+      transitionTimingFunction: {
+        smooth: "var(--transition-smooth)",
       },
       borderRadius: {
         lg: "var(--radius)",
