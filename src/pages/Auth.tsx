@@ -44,7 +44,11 @@ const Auth = () => {
           .from("user_roles")
           .insert({ user_id: data.user.id, role });
 
-        if (roleError) throw roleError;
+        if (roleError) {
+          console.error("Role insertion error:", roleError);
+          toast.error("Account created but role assignment failed. Please contact support.");
+          return;
+        }
 
         toast.success("Account created successfully!");
         navigate(role === "faculty" ? "/faculty" : "/student");
@@ -73,14 +77,25 @@ const Auth = () => {
       if (error) throw error;
 
       if (data.user) {
-        const { data: roleData } = await supabase
+        const { data: roleData, error: roleError } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", data.user.id)
-          .single();
+          .maybeSingle();
+
+        if (roleError) {
+          console.error("Role fetch error:", roleError);
+          toast.error("Unable to determine user role. Please contact support.");
+          return;
+        }
+
+        if (!roleData) {
+          toast.error("No role assigned to this account. Please contact support.");
+          return;
+        }
 
         toast.success("Signed in successfully!");
-        navigate(roleData?.role === "faculty" ? "/faculty" : "/student");
+        navigate(roleData.role === "faculty" ? "/faculty" : "/student");
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in");

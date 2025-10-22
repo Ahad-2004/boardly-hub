@@ -31,11 +31,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         if (session?.user) {
           setTimeout(async () => {
-            const { data } = await supabase
+            const { data, error } = await supabase
               .from("user_roles")
               .select("role")
               .eq("user_id", session.user.id)
-              .single();
+              .maybeSingle();
+            
+            if (error) {
+              console.error("Error fetching user role:", error);
+            }
             setUserRole(data?.role ?? null);
           }, 0);
         } else {
@@ -52,11 +56,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("user_roles")
           .select("role")
           .eq("user_id", session.user.id)
-          .single();
+          .maybeSingle();
+        
+        if (error) {
+          console.error("Error fetching user role:", error);
+        }
         setUserRole(data?.role ?? null);
       }
       
