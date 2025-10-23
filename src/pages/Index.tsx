@@ -71,9 +71,11 @@ const Index = () => {
         </div>
 
         <div className="text-center">
-          <Button size="lg" onClick={() => navigate("/auth")} className="px-8">
-            Sign In to Get Started
-          </Button>
+          <div className="flex items-center justify-center gap-4">
+            <Button size="lg" onClick={() => navigate("/auth")} className="px-8">
+              Sign In to Get Started
+            </Button>
+          </div>
         </div>
       </main>
     </div>

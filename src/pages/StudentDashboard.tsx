@@ -36,21 +36,11 @@ const StudentDashboard = () => {
 
   const fetchNotices = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      
-      const { data, error } = await supabase
-        .from("notices")
-        .select(`
-          *,
-          profiles:created_by (full_name)
-        `)
-        .gte("expiry_date", today)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setNotices(data || []);
+      const notices = await import("@/lib/notices").then(m => m.fetchNoticesWithProfiles({ onlyActive: true }));
+      setNotices(notices || []);
     } catch (error: any) {
-      toast.error("Failed to fetch notices");
+      console.error('Fetch notices uncaught error:', error);
+      toast.error(`Failed to fetch notices: ${error?.message ?? 'Unknown'}`);
     } finally {
       setLoading(false);
     }

@@ -1,26 +1,28 @@
-# Welcome to your Lovable project
+# Digital Notice Board
 
-## Project info
+A modern digital notice board system for educational institutions, built with React and Supabase.
 
-**URL**: https://lovable.dev/projects/610e6c01-44be-4a93-8b60-d7bb6026cd8c
+## Features
 
-## How can I edit this code?
+- User Authentication (Faculty/Student roles)
+- Create and manage notices (Faculty)
+- View notices filtered by department and year (Students)
+- Real-time updates
+- Responsive design
+- Dark mode support
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- React with TypeScript
+- Supabase (Auth & Database)
+- Shadcn/ui Components
+- TailwindCSS
+- Vite
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/610e6c01-44be-4a93-8b60-d7bb6026cd8c) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+1. Clone the repository
+2. Install dependencies:
 
 ```sh
 # Step 1: Clone the repository using the project's Git URL.
@@ -50,24 +52,24 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
-## What technologies are used for this project?
+## Project Structure
 
-This project is built with:
+- `/src`
+  - `/components` - Reusable components
+  - `/contexts` - React contexts (Auth)
+  - `/hooks` - Custom hooks
+  - `/integrations` - External service integrations (Supabase)
+  - `/lib` - Utility functions
+  - `/pages` - Route components
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Building for Production
 
-## How can I deploy this project?
+```bash
+npm run build
+```
 
-Simply open [Lovable](https://lovable.dev/projects/610e6c01-44be-4a93-8b60-d7bb6026cd8c) and click on Share -> Publish.
+## Preview Production Build
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+npm start
+```

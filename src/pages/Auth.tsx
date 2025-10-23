@@ -8,21 +8,45 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, AlertCircle, CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface PasswordRequirement {
+  re: RegExp;
+  label: string;
+}
+
+const passwordRequirements: PasswordRequirement[] = [
+  { re: /.{12,}/, label: "At least 12 characters long" },
+  { re: /[A-Z]/, label: "At least one uppercase letter" },
+  { re: /[a-z]/, label: "At least one lowercase letter" },
+  { re: /[0-9]/, label: "At least one number" },
+  { re: /[^A-Za-z0-9]/, label: "At least one special character" },
+];
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
+  const [signupPassword, setSignupPassword] = useState("");
+  const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
   const navigate = useNavigate();
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setLoading(true);
-
+    
     const formData = new FormData(e.currentTarget);
     const email = formData.get("signup-email") as string;
     const password = formData.get("signup-password") as string;
     const fullName = formData.get("full-name") as string;
     const role = formData.get("role") as "faculty" | "student";
+
+    // Validate password meets all requirements
+    const passwordIsValid = passwordRequirements.every(({ re }) => re.test(password));
+    if (!passwordIsValid) {
+      toast.error("Password does not meet all requirements");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -69,34 +93,47 @@ const Auth = () => {
     const password = formData.get("signin-password") as string;
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
 
-      if (data.user) {
-        const { data: roleData, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", data.user.id)
-          .maybeSingle();
-
-        if (roleError) {
-          console.error("Role fetch error:", roleError);
-          toast.error("Unable to determine user role. Please contact support.");
-          return;
+      // signIn may return before the session is fully available to getSession().
+      // Retry a few times to read the session from the client to avoid race conditions
+      let sessionUserId: string | null = data?.user?.id ?? null;
+      if (!sessionUserId) {
+        // try to re-read session a few times
+        const maxAttempts = 5;
+        for (let i = 0; i < maxAttempts && !sessionUserId; i++) {
+          // small backoff
+          await new Promise((res) => setTimeout(res, 250 * (i + 1)));
+          const { data: sessionData } = await supabase.auth.getSession();
+          sessionUserId = sessionData?.session?.user?.id ?? null;
         }
-
-        if (!roleData) {
-          toast.error("No role assigned to this account. Please contact support.");
-          return;
-        }
-
-        toast.success("Signed in successfully!");
-        navigate(roleData.role === "faculty" ? "/faculty" : "/student");
       }
+
+      if (!sessionUserId) {
+        throw new Error('Unable to establish session after sign-in.');
+      }
+
+      // fetch role for the user and navigate only after role is known
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', sessionUserId)
+        .maybeSingle();
+
+      if (roleError) {
+        console.error('Role fetch error:', roleError);
+        toast.error('Unable to determine user role. Please contact support.');
+        return;
+      }
+
+      if (!roleData) {
+        toast.error('No role assigned to this account. Please contact support.');
+        return;
+      }
+
+      toast.success('Signed in successfully!');
+      navigate(roleData.role === 'faculty' ? '/faculty' : '/student');
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in");
     } finally {
@@ -135,6 +172,7 @@ const Auth = () => {
                       name="signin-email"
                       type="email"
                       placeholder="your.email@university.edu"
+                      autoComplete="email"
                       required
                     />
                   </div>
@@ -146,6 +184,7 @@ const Auth = () => {
                       name="signin-password"
                       type="password"
                       placeholder="••••••••"
+                      autoComplete="current-password"
                       required
                     />
                   </div>
@@ -176,6 +215,7 @@ const Auth = () => {
                       name="signup-email"
                       type="email"
                       placeholder="your.email@university.edu"
+                      autoComplete="email"
                       required
                     />
                   </div>
@@ -187,9 +227,37 @@ const Auth = () => {
                       name="signup-password"
                       type="password"
                       placeholder="••••••••"
+                      autoComplete="new-password"
                       required
-                      minLength={6}
+                      minLength={12}
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      onFocus={() => setShowPasswordRequirements(true)}
+                      onBlur={() => setShowPasswordRequirements(false)}
+                      aria-describedby="password-requirements"
                     />
+                    {showPasswordRequirements && (
+                      <div id="password-requirements" className="mt-2 space-y-2 text-sm">
+                        {passwordRequirements.map(({ re, label }) => {
+                          const isMet = re.test(signupPassword);
+                          return (
+                            <div key={label} className="flex items-center gap-2">
+                              {isMet ? (
+                                <CheckCircle2 className="w-4 h-4 text-success" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 text-muted-foreground" />
+                              )}
+                              <span className={cn(
+                                "text-muted-foreground",
+                                isMet && "text-success"
+                              )}>
+                                {label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -205,7 +273,11 @@ const Auth = () => {
                     </Select>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={loading || !signupPassword || !passwordRequirements.every(({ re }) => re.test(signupPassword))}
+                  >
                     {loading ? "Creating account..." : "Sign Up"}
                   </Button>
                 </form>

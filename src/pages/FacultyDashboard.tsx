@@ -31,19 +31,11 @@ const FacultyDashboard = () => {
 
   const fetchNotices = async () => {
     try {
-      const { data, error } = await supabase
-        .from("notices")
-        .select(`
-          *,
-          profiles:created_by (full_name)
-        `)
-        .eq("created_by", user?.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setNotices(data || []);
+      const notices = await import("@/lib/notices").then(m => m.fetchNoticesWithProfiles({ createdBy: user?.id }));
+      setNotices(notices || []);
     } catch (error: any) {
-      toast.error("Failed to fetch notices");
+      console.error('Fetch notices error:', error);
+      toast.error(`Failed to fetch notices: ${error?.message ?? 'Unknown'}`);
     } finally {
       setLoading(false);
     }
@@ -141,10 +133,16 @@ const FacultyDashboard = () => {
                 Create Notice
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent 
+                className="max-w-2xl max-h-[90vh] overflow-y-auto"
+                aria-describedby="notice-form-description"
+              >
               <DialogHeader>
                 <DialogTitle>{editingNotice ? "Edit Notice" : "Create New Notice"}</DialogTitle>
               </DialogHeader>
+              <p id="notice-form-description" className="sr-only">
+                {editingNotice ? "Form to edit an existing notice" : "Form to create a new notice"}
+              </p>
               <NoticeForm
                 onSubmit={editingNotice ? handleEditNotice : handleCreateNotice}
                 initialData={editingNotice}

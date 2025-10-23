@@ -4,14 +4,38 @@ import type { Database } from './types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const USE_INMEMORY_AUTH = import.meta.env.VITE_SUPABASE_USE_INMEMORY === 'true';
+
+// Optional in-memory storage implementation for auth (useful for testing multiple
+// accounts in different tabs without localStorage sync). Enable by setting
+// VITE_SUPABASE_USE_INMEMORY=true in your .env.
+const createInMemoryStorage = () => {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => {
+      return store.has(key) ? store.get(key) as string : null;
+    },
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    }
+  } as Storage;
+};
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage: USE_INMEMORY_AUTH ? createInMemoryStorage() : localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    headers: {
+      apikey: SUPABASE_PUBLISHABLE_KEY,
+    },
+  },
 });
