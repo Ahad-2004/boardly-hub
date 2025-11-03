@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/firebase/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,36 +51,28 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: fullName,
-          },
-        },
+      console.log("[Auth] Creating user account...");
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = cred.user.uid;
+      console.log("[Auth] User created with UID:", uid);
+
+      console.log("[Auth] Creating user role document...");
+      await setDoc(doc(db, "user_roles", uid), {
+        role,
+        full_name: fullName,
+        created_at: new Date().toISOString(),
       });
+      console.log("[Auth] Role document created successfully");
 
-      if (error) throw error;
-
-      if (data.user) {
-        // Insert user role
-        const { error: roleError } = await supabase
-          .from("user_roles")
-          .insert({ user_id: data.user.id, role });
-
-        if (roleError) {
-          console.error("Role insertion error:", roleError);
-          toast.error("Account created but role assignment failed. Please contact support.");
-          return;
-        }
-
-        toast.success("Account created successfully!");
-        navigate(role === "faculty" ? "/faculty" : "/student");
-      }
+      toast.success("Account created successfully!");
+      navigate(role === "faculty" ? "/faculty" : "/student");
     } catch (error: any) {
-      toast.error(error.message || "Failed to sign up");
+      console.error("[Auth] Sign up error:", error.code, error.message);
+      if (error.code === 'permission-denied') {
+        toast.error("Permission denied. Please check Firestore security rules.");
+      } else {
+        toast.error(error.message || "Failed to sign up");
+      }
     } finally {
       setLoading(false);
     }
@@ -93,42 +87,13 @@ const Auth = () => {
     const password = formData.get("signin-password") as string;
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-
-      // signIn may return before the session is fully available to getSession().
-      // Retry a few times to read the session from the client to avoid race conditions
-      let sessionUserId: string | null = data?.user?.id ?? null;
-      if (!sessionUserId) {
-        // try to re-read session a few times
-        const maxAttempts = 5;
-        for (let i = 0; i < maxAttempts && !sessionUserId; i++) {
-          // small backoff
-          await new Promise((res) => setTimeout(res, 250 * (i + 1)));
-          const { data: sessionData } = await supabase.auth.getSession();
-          sessionUserId = sessionData?.session?.user?.id ?? null;
-        }
-      }
-
-      if (!sessionUserId) {
-        throw new Error('Unable to establish session after sign-in.');
-      }
-
-      // fetch role for the user and navigate only after role is known
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', sessionUserId)
-        .maybeSingle();
-
-      if (roleError) {
-        console.error('Role fetch error:', roleError);
-        toast.error('Unable to determine user role. Please contact support.');
-        return;
-      }
-
-      if (!roleData) {
-        toast.error('No role assigned to this account. Please contact support.');
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const uid = cred.user.uid;
+      const roleDoc = await getDoc(doc(db, "user_roles", uid));
+      const roleData = roleDoc.exists() ? (roleDoc.data() as any) : null;
+      if (!roleData?.role) {
+        toast("Welcome! Let's finish setting up your account.");
+        navigate('/setup-role');
         return;
       }
 

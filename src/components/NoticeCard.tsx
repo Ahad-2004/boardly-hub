@@ -71,7 +71,7 @@ export const NoticeCard = ({ notice, onEdit, onDelete, showActions }: NoticeCard
           )}
         </div>
         
-        <CardDescription className="flex flex-col gap-1 text-sm mt-2">
+        <div className="flex flex-col gap-1 text-sm mt-2 text-muted-foreground">
           <div className="flex items-center gap-2">
             <User className="h-4 w-4" />
             <span>{notice.profiles?.full_name || "Unknown"}</span>
@@ -80,7 +80,7 @@ export const NoticeCard = ({ notice, onEdit, onDelete, showActions }: NoticeCard
             <Calendar className="h-4 w-4" />
             <span>Expires: {format(new Date(notice.expiry_date), "PPP")}</span>
           </div>
-        </CardDescription>
+        </div>
       </CardHeader>
       
       <CardContent>

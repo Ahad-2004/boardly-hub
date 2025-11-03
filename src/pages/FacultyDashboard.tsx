@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { collection, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { NoticeCard } from "@/components/NoticeCard";
 import { NoticeForm } from "@/components/NoticeForm";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { subscribeToNoticesWithProfiles } from "@/lib/notices";
 
 const FacultyDashboard = () => {
   const { user, userRole, signOut, loading: authLoading } = useAuth();
@@ -24,35 +26,36 @@ const FacultyDashboard = () => {
   }, [user, userRole, authLoading, navigate]);
 
   useEffect(() => {
-    if (user && userRole === "faculty") {
-      fetchNotices();
-    }
+    if (!(user && userRole === "faculty")) return;
+    setLoading(true);
+    const unsub = subscribeToNoticesWithProfiles(
+      { createdBy: user?.uid || null },
+      (data) => {
+        setNotices(data || []);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Realtime notices error:', err);
+        toast.error('Failed to subscribe to notices');
+        setLoading(false);
+      }
+    );
+    return () => unsub();
   }, [user, userRole]);
 
-  const fetchNotices = async () => {
-    try {
-      const notices = await import("@/lib/notices").then(m => m.fetchNoticesWithProfiles({ createdBy: user?.id }));
-      setNotices(notices || []);
-    } catch (error: any) {
-      console.error('Fetch notices error:', error);
-      toast.error(`Failed to fetch notices: ${error?.message ?? 'Unknown'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // real-time subscription above keeps notices in sync
 
   const handleCreateNotice = async (data: any) => {
     try {
-      const { error } = await supabase.from("notices").insert({
+      await addDoc(collection(db, "notices"), {
         ...data,
-        created_by: user?.id,
+        created_by: user?.uid,
+        created_at: new Date().toISOString(),
       });
-
-      if (error) throw error;
 
       toast.success("Notice created successfully!");
       setIsDialogOpen(false);
-      fetchNotices();
+      // realtime will update list automatically
     } catch (error: any) {
       toast.error(error.message || "Failed to create notice");
     }
@@ -60,17 +63,12 @@ const FacultyDashboard = () => {
 
   const handleEditNotice = async (data: any) => {
     try {
-      const { error } = await supabase
-        .from("notices")
-        .update(data)
-        .eq("id", editingNotice.id);
-
-      if (error) throw error;
+      await updateDoc(doc(db, "notices", editingNotice.id), data);
 
       toast.success("Notice updated successfully!");
       setIsDialogOpen(false);
       setEditingNotice(null);
-      fetchNotices();
+      // realtime will update list automatically
     } catch (error: any) {
       toast.error(error.message || "Failed to update notice");
     }
@@ -80,12 +78,10 @@ const FacultyDashboard = () => {
     if (!confirm("Are you sure you want to delete this notice?")) return;
 
     try {
-      const { error } = await supabase.from("notices").delete().eq("id", id);
-
-      if (error) throw error;
+      await deleteDoc(doc(db, "notices", id));
 
       toast.success("Notice deleted successfully!");
-      fetchNotices();
+      // realtime will update list automatically
     } catch (error: any) {
       toast.error(error.message || "Failed to delete notice");
     }

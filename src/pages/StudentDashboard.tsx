@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { NoticeCard } from "@/components/NoticeCard";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { LogOut, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { subscribeToNoticesWithProfiles } from "@/lib/notices";
 
 const StudentDashboard = () => {
   const { user, userRole, signOut, loading: authLoading } = useAuth();
@@ -25,26 +25,28 @@ const StudentDashboard = () => {
   }, [user, userRole, authLoading, navigate]);
 
   useEffect(() => {
-    if (user && userRole === "student") {
-      fetchNotices();
-    }
+    if (!(user && userRole === "student")) return;
+    setLoading(true);
+    const unsub = subscribeToNoticesWithProfiles(
+      { onlyActive: true },
+      (data) => {
+        setNotices(data || []);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Realtime notices error:', err);
+        toast.error('Failed to subscribe to notices');
+        setLoading(false);
+      }
+    );
+    return () => unsub();
   }, [user, userRole]);
 
   useEffect(() => {
     filterNotices();
   }, [notices, department, year]);
 
-  const fetchNotices = async () => {
-    try {
-      const notices = await import("@/lib/notices").then(m => m.fetchNoticesWithProfiles({ onlyActive: true }));
-      setNotices(notices || []);
-    } catch (error: any) {
-      console.error('Fetch notices uncaught error:', error);
-      toast.error(`Failed to fetch notices: ${error?.message ?? 'Unknown'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // real-time subscription above keeps notices in sync
 
   const filterNotices = () => {
     const filtered = notices.filter(

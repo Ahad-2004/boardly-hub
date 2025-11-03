@@ -9,6 +9,8 @@ import Auth from "./pages/Auth";
 import FacultyDashboard from "./pages/FacultyDashboard";
 import StudentDashboard from "./pages/StudentDashboard";
 import NotFound from "./pages/NotFound";
+import FirebaseTest from "./pages/FirebaseTest";
+import SetupRole from "./pages/SetupRole";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +24,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/firebase-test" element={<FirebaseTest />} />
+            <Route path="/setup-role" element={<SetupRole />} />
             <Route path="/faculty" element={<FacultyDashboard />} />
             <Route path="/student" element={<StudentDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

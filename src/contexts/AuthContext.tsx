@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/firebase/config";
 
 type UserRole = "faculty" | "student" | null;
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   userRole: UserRole;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -17,157 +17,50 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // First, check for existing session (synchronous init)
-    let isMounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        console.debug('[Auth] initial getSession', session?.user?.id ?? null);
-        if (!isMounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          const { data, error } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", session.user.id)
-            .maybeSingle();
-          if (error) console.error("Error fetching user role:", error);
-          setUserRole(data?.role ?? null);
-        } else {
-          setUserRole(null);
-        }
-      } catch (err) {
-        console.error('[Auth] initial getSession error', err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    })();
-
-    // Then set up auth state listener for subsequent changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.debug('[Auth] onAuthStateChange event:', event, session?.user?.id ?? null);
-      setSession(session);
-      setUser(session?.user ?? null);
-      // Fetch role asynchronously; don't block UI initialization
-      (async () => {
-        if (session?.user) {
-          const { data, error } = await supabase
-            .from("user_roles")
-            .select("role")
-            .eq("user_id", session.user.id)
-            .maybeSingle();
-          if (error) console.error("Error fetching user role:", error);
-          setUserRole(data?.role ?? null);
-        } else {
-          setUserRole(null);
-        }
-      })();
-    });
-
-    // Listen to storage events to debug cross-tab session changes and rehydrate
-    const storageHandler = async (e: StorageEvent) => {
-      if (!e.key) return;
-      if (e.key.includes('supabase') || e.key.includes('Supabase')) {
-        // storage event: another tab changed the auth state
-        // console.debug('[Auth] storage event', e.key, e.oldValue ? 'old' : null, e.newValue ? 'new' : null);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
-          // rehydrated session from storage event
-          setSession(session);
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            const { data, error } = await supabase
-              .from("user_roles")
-              .select("role")
-              .eq("user_id", session.user.id)
-              .maybeSingle();
-            if (!error) setUserRole(data?.role ?? null);
+          console.log("[Auth] Fetching role for user:", firebaseUser.uid);
+          const roleDoc = await getDoc(doc(db, "user_roles", firebaseUser.uid));
+          if (roleDoc.exists()) {
+            const role = (roleDoc.data() as any).role as UserRole;
+            console.log("[Auth] User role found:", role);
+            setUserRole(role);
           } else {
+            console.log("[Auth] No role document found for user");
             setUserRole(null);
           }
-        } catch (err) {
-          console.error('[Auth] failed to rehydrate session', err);
-        }
-      }
-    };
-    window.addEventListener('storage', storageHandler);
-
-    // When the tab becomes visible or window gains focus, re-check session to avoid logout on tab switches
-    const rehydrate = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          const { data, error } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          if (!error) setUserRole(data?.role ?? null);
-        } else {
+        } catch (err: any) {
+          console.error("[Auth] failed to fetch user role:", err.code, err.message);
+          if (err.code === 'permission-denied') {
+            console.error("[Auth] Firestore rules are blocking access to user_roles collection");
+          }
           setUserRole(null);
         }
-      } catch (err) {
-        console.error('[Auth] rehydrate on visibility failed', err);
+      } else {
+        setUserRole(null);
       }
-    };
-
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') rehydrate();
+      setLoading(false);
     });
-    window.addEventListener('focus', rehydrate);
 
-    // Periodic session check as a fallback to keep session fresh (every 5 minutes)
-    const intervalId = setInterval(async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        // If session exists and in-memory/user is null, rehydrate
-        if (session?.user && !user) {
-          setSession(session);
-          setUser(session.user);
-          const { data, error } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-          if (!error) setUserRole(data?.role ?? null);
-        }
-      } catch (err) {
-        // silently ignore
-      }
-    }, 5 * 60 * 1000);
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-      window.removeEventListener('storage', storageHandler);
-      document.removeEventListener('visibilitychange', rehydrate as any);
-      window.removeEventListener('focus', rehydrate as any);
-      clearInterval(intervalId);
-    };
+    return () => unsubscribe();
   }, []);
 
-  const signOut = async () => {
-    console.debug('[Auth] signing out');
-    await supabase.auth.signOut();
+  const doSignOut = async () => {
+    await signOut(auth);
     setUser(null);
-    setSession(null);
     setUserRole(null);
     navigate("/auth");
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, signOut }}>
+    <AuthContext.Provider value={{ user, userRole, loading, signOut: doSignOut }}>
       {children}
     </AuthContext.Provider>
   );
