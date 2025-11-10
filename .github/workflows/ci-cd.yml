@@ -53,12 +53,12 @@ jobs:
         run: npm run build
 
       - name: Deploy to Vercel
-        if: ${{ secrets.VERCEL_TOKEN }}
         uses: amondnet/vercel-action@v20
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-args: --prod
           working-directory: ./
+        continue-on-error: true
 
       - name: Vercel deployment info
         run: echo "Deployed to Vercel (see Vercel dashboard or action logs)"
@@ -84,9 +84,9 @@ jobs:
         run: npm run build
           
       - name: Deploy to Firebase
-        if: ${{ secrets.FIREBASE_TOKEN }}
         uses: w9jds/firebase-action@master
         with:
           args: deploy --only hosting
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        continue-on-error: true
