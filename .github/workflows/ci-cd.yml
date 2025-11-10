@@ -53,7 +53,7 @@ jobs:
         run: npm run build
 
       - name: Deploy to Vercel
-        if: ${{ secrets.VERCEL_TOKEN != '' }}
+        if: secrets.VERCEL_TOKEN != ''
         uses: amondnet/vercel-action@v20
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -84,7 +84,7 @@ jobs:
         run: npm run build
           
       - name: Deploy to Firebase
-        if: ${{ secrets.FIREBASE_TOKEN != '' }}
+        if: secrets.FIREBASE_TOKEN != ''
         uses: w9jds/firebase-action@master
         with:
           args: deploy --only hosting
